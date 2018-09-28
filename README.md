@@ -88,10 +88,10 @@ And on `wgclientvm` we have:
 [Interface]
 Address = 10.33.33.2/32
 ListenPort = 30003
-PrivateKey = CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=
+PrivateKey = CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=
 
 [Peer]
-PublicKey = DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
+PublicKey = DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
 AllowedIps = 0.0.0.0/0, ::0/0
 Endpoint = 1.1.1.1:30003
 ```
@@ -129,12 +129,12 @@ from both sides.
 [#] ip -4 rule add table main suppress_prefixlength 0
 [wgclientvm]# wg
 interface: wg0
-  public key: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+  public key: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
   private key: (hidden)
   listening port: 30003
   fwmark: 0xca6c
 
-peer: DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
+peer: DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
   endpoint: 1.1.1.1:30003
   allowed ips: 0.0.0.0/0, ::/0
   latest handshake: 2 seconds ago
@@ -157,9 +157,17 @@ to the Mac laptop host `wgclient`. Achieving this is the subject of the next sec
 
 ## Routing and Traffic Filtering
 Routing all traffic over the VPN needs to happen even though the Mac laptop has only one
-interface `en0` that is connected to the local wireless network. Basic routing through the default
-gateway of this network needs to remain intact, but we also need to send everything down to the
-`wgclientvm` system for routing over the established VPN tunnel.
+interface `en0` that is connected to the local wireless network. Basic routing through the
+default gateway of this network needs to remain intact, but we also need to first send
+everything down to the `wgclientvm` system for routing over the established VPN tunnel.
+
+A convenience script `wg-routes.sh` is included for this task. This script is meant to be
+executed on the Mac laptop `wgclient` adds three new routes to the routing table on the Mac.
+It doesn't change the existing default route, but it is overridden with two more specific
+routes - each for half of the entire IPv4 address space with a gateway of the `wgclientvm`
+IP. The final route is for the Wireguard server out of the gateway originally assigned to the
+default route.  The original default route can optionally be deleted after these routes are
+established and everything is sent over the VPN.
 
 ### Traffic Filtering with PF and iptables
 
