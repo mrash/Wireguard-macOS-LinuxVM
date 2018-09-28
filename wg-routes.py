@@ -58,7 +58,7 @@ def main():
     else:
         raise NameError("[*] Specify the local VM IP/hostname where the Wireguard client is running with --wg-client")
 
-    if not cargs.cmd:
+    if not cargs.cmd or (cargs.cmd.lower() != 'up' and cargs.cmd.lower() != 'down'):
         raise NameError("[*] Set --cmd <up>|<down>")
 
     if cargs.default_gw:
@@ -70,9 +70,39 @@ def main():
     ### VM IP's, add the routes
     route_update(default_gw, wg_client, wg_server, cargs)
 
+    if cargs.cmd.lower() == 'up':
+        up_guidance()
+    else:
+        down_guidance()
+
     return 0
 
+def up_guidance():
+    print '''
+With routing configured to send traffic to the Wireguard client system
+'%s', it is usually necessary to add NAT rule in iptables along with allowing
+IP forwarding. The NAT rule should translate incoming IP traffic from the Mac
+to the Wireguard client IP assigned in the 'Address' line in the Wireguard
+interface configuration file. The incoming traffic from the Mac is normally
+the IP assigned to a virtual interface such as 'vnic0'. E.g.:
+
+[wgclientvm]# iptables -t nat -A POSTROUTING -s <vnic0_IP> -j SNAT --to <WG_client_IP>
+
+[wgclientvm]# echo 1 > /proc/sys/net/ipv4/ip_forward
+'''
+    return
+
+def down_guidance():
+    print '''
+Applicable routes have been removed.
+'''
+    return
+
 def route_update(default_gw, wg_client, wg_server, cargs):
+
+    ### route add 0.0.0.0/1 <wg_client>
+    ### route add 128.0.0.0/1 <wg_client>
+    ### route add <wg_server> <default_gw>
 
     ### route add 0.0.0.0/1 10.111.55.31
     ### route add 128.0.0.0/1 10.111.55.31
@@ -82,6 +112,7 @@ def route_update(default_gw, wg_client, wg_server, cargs):
     if cargs.cmd.lower() == 'down':
         update_cmd = 'delete'
 
+    print
     for cmd in ["route %s 0.0.0.0/1 %s" % (update_cmd, wg_client),
             "route %s 128.0.0.0/1 %s" % (update_cmd, wg_client),
             "route %s %s %s" % (update_cmd, wg_server, default_gw)
@@ -91,6 +122,29 @@ def route_update(default_gw, wg_client, wg_server, cargs):
         if (es != 0):
             for line in out:
                 print line
+        else:
+            ### look for indications of errors not caught by the process
+            ### exit status
+            found_err = False
+            if cargs.cmd.lower() == 'up':
+                ### # route add 0.0.0.0/1 10.211.55.31
+                ### route: writing to routing socket: File exists
+                ### add net 0.0.0.0: gateway 10.211.55.31: File exists
+                for line in out:
+                    if 'File exists' in line:
+                        found_err = True
+                        break
+            elif cargs.cmd.lower() == 'down':
+                for line in out:
+                    ### # route delete 0.0.0.0/1 10.211.55.31
+                    ### route: writing to routing socket: not in table
+                    ### delete net 0.0.0.0: gateway 10.211.55.31: not in table
+                    if 'not in table' in line:
+                        found_err = True
+                        break
+            if found_err:
+                for line in out:
+                    print line
 
     return
 
@@ -154,6 +208,10 @@ def run_cmd(cmd, cargs):
 
     if (es != 0):
         print "[-] Non-zero exit status '%d' for CMD: '%s'" % (es, cmd)
+
+    if cargs.verbose:
+        for line in out:
+            print line
 
     return es, out
 
