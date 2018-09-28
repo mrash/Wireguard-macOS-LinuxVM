@@ -29,6 +29,7 @@
 #
 
 from tempfile import NamedTemporaryFile
+import socket
 import re
 import argparse
 import sys, os
