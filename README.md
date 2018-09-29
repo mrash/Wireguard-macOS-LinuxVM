@@ -214,6 +214,14 @@ Wireguard tunnel. Second, IP forwarding needs to be allowed on `wgclientvm` as w
 [wgclientvm]# echo 1 > /proc/sys/net/ipv4/ip_forward
 ```
 
+This concludes the necessary steps to route all traffic from both the Mac laptop `wgclient`
+and the `wgclientvm` systems through Wireguard to the `wgserver` system and out to the
+broader Internet. Note that the `wg-quick` tool that instantiated the Wireguard instance
+on `wgclientvm` also sets up routing such that everything is sent over Wireguard.
+
+Now let's test it:
+```bash
+```
 
 ### Traffic Filtering with PF and iptables
 
