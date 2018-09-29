@@ -158,12 +158,13 @@ WG_SERVER           %s
 
 def up_guidance(wg_client):
     print '''
-With routing configured to send traffic to the Wireguard client system '%s',
-it is usually necessary to add NAT rule in iptables along with allowing IP
-forwarding. The NAT rule should translate incoming IP traffic from the Mac
-to the Wireguard client IP assigned in the 'Address' line in the Wireguard
-interface configuration file. The incoming traffic from the Mac is normally
-the IP assigned to a virtual interface such as 'vnic0'. E.g.:
+With routing configured to send traffic to the Wireguard client system
+'%s', it is usually necessary to add NAT rule in iptables along with
+allowing IP forwarding. The NAT rule should translate incoming IP traffic
+from the Mac to the Wireguard client IP assigned in the 'Address' line in
+the Wireguard interface configuration file. The incoming traffic from the
+Mac is normally the IP assigned to a virtual interface such as 'vnic0'.
+E.g.:
 
 [wgclientvm]# iptables -t nat -A POSTROUTING -s <vnic0_IP> -j SNAT --to <WG_client_IP>
 
@@ -174,7 +175,8 @@ the IP assigned to a virtual interface such as 'vnic0'. E.g.:
 def down_guidance(wg_client):
     print '''
 Applicable routes have been removed. The corresponding NAT rule and IP
-forwarding configuration can be removed from the '%s' Wireguard client system.
+forwarding configuration can be removed from the '%s' Wireguard
+client system.
 ''' % wg_client
     return
 
