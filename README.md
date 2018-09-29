@@ -43,8 +43,8 @@ To fully implement Wireguard in this manner, we'll assume the following:
  * Wireguard client - Mac laptop hostname and IP addresses:
    * Mac laptop hostname: `wgclient`
    * Mac laptop wireless IP on the coffee shop network: `192.168.10.54`, interface: `en0`
-   * Mac laptop Ubuntu VM wireguard hostname: `wgclientvm`
-   * Mac laptop Ubuntu VM wireguard IP: `10.33.33.2`, interface: `wg0`
+   * Mac laptop Ubuntu VM Wireguard hostname: `wgclientvm`, IP: `10.211.44.31`
+   * Mac laptop Ubuntu VM Wireguard IP: `10.33.33.2`, interface: `wg0`
  * Wireguard server - Ubuntu system hostname and IP addresses:
    * Hostname: `wgserver`
    * IP: `2.2.2.2`, interface: `eth0`
@@ -99,7 +99,7 @@ Endpoint = 1.1.1.1:30003
 Note that the `AllowedIps` line in the client configuration allows all IPv4 and IPv6 addresses.
 This is so that connections to any systems around the Internet worldwide will be allowed to
 transit the Wireguard VPN. The server side does not need the same `AllowedIPs` line because the
-source address of all traffic will be the client IP of `10.33.33.2`.
+source address of all traffic from the server's perspective will be the client IP of `10.33.33.2`.
 
 With the Wireguard client and server configurations defined, it is time to bring up the VPN
 from both sides.
@@ -161,13 +161,59 @@ interface `en0` that is connected to the local wireless network. Basic routing t
 default gateway of this network needs to remain intact, but we also need to first send
 everything down to the `wgclientvm` system for routing over the established VPN tunnel.
 
-A convenience script `wg-routes.sh` is included for this task. This script is meant to be
-executed on the Mac laptop `wgclient` adds three new routes to the routing table on the Mac.
-It doesn't change the existing default route, but it is overridden with two more specific
-routes - each for half of the entire IPv4 address space with a gateway of the `wgclientvm`
-IP. The final route is for the Wireguard server out of the gateway originally assigned to the
-default route.  The original default route can optionally be deleted after these routes are
-established and everything is sent over the VPN.
+A convenience script `wg-routes.py` is included for this task. This script is meant to be
+executed on the Mac laptop `wgclient` and it adds three new routes to the routing table on
+the Mac. Although the existing default route is not changed, it is overridden with two more
+specific routes - each for half of the entire IPv4 address space with a gateway of the
+`wgclientvm` IP. The final route is for the Wireguard server out of the gateway originally
+assigned to the default route. The original default route can optionally be deleted after
+these routes are established and everything is sent over the VPN.
+
+The `wg-routes.py` script has a setup mode that generates a config file from the specified
+Wireguard endpoints, and an operational mode that adds, deletes, or checks the status of
+Wireguard routes. We start with the setup phase:
+
+```bash
+[wgclient]# ./wg-routes.py --setup --wg-client 10.211.44.31 --wg-server 2.2.2.2
+Config written to '/var/root/.wg-routes.conf', now 'up|down|status' cmds can be used.
+```
+
+With the config file written, we can now bring the routes up and also check the status
+(some output has been removed for brevity):
+
+```bash
+[wgclient]# ./wg-routes.py up
+Running cmd: 'route add 0.0.0.0/1 10.211.44.31'
+Running cmd: 'route add 128.0.0.0/1 10.211.44.31'
+Running cmd: 'route add 2.2.2.2 192.168.10.1'
+
+[wgclient]# ./wg-routes.py status
+Wireguard client route active: '0/1        10.211.44.31  UGSc  50  0   vnic0'
+Wireguard client route active: '128.0/1    10.211.44.31  UGSc   1  0   vnic0'
+Wireguard server route active: '2.2.2.2    192.168.10.1  UGHS   0  0     en0'
+```
+
+Note in the above output that there is no need to manually specify the default
+gateway `192.168.10.1` on the wireless network since `wg-routes.py` automatically
+parses it out of the routing table.
+
+```bash
+[wgclient]# ./wg-routes.py down
+Running cmd: 'route delete 0.0.0.0/1 10.211.44.31'
+Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
+Running cmd: 'route delete 2.2.2.2 192.168.10.1'
+```
+
+With the routes now directing all IP traffic to the `wgclientvm` system, there are
+two details to take care of. First, on `wgclientvm` we need to create a NAT rule so that
+all incoming traffic from the Mac laptop are translated to the source IP of the
+Wireguard tunnel. Second, IP forwarding needs to be allowed on `wgclientvm` as well:
+
+```bash
+[wgclientvm]# iptables -t nat -A POSTROUTING -s 10.211.44.2 -j SNAT --to 10.33.33.2
+[wgclientvm]# echo 1 > /proc/sys/net/ipv4/ip_forward
+```
+
 
 ### Traffic Filtering with PF and iptables
 
