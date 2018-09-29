@@ -79,16 +79,16 @@ def main():
 
         return 0
 
-    ### we must be in --set, --list, or --version mode. Write the config based on
-    ### command line arguments in --set mode.
+    ### we must be in --setup, --list, or --version mode. Write the config based on
+    ### command line arguments in --setup mode.
     cargs = parse_cmdline()
 
     if cargs.version:
         print "wg-routes-" + __version__
         return 0
 
-    if not cargs.set and not cargs.list:
-        raise NameError("Must use one of --set or --list")
+    if not cargs.setup and not cargs.list:
+        raise NameError("Must use one of --setup or --list")
 
     if cargs.list:
         display_config(config_file, cargs)
@@ -103,7 +103,7 @@ def main():
     if cargs.config_file:
         config_file = cargs.config_file
 
-    if cargs.set:
+    if cargs.setup:
         ### write the config and exit
         write_config(config_file, cargs)
         print "Config written to '%s', now 'up|down|status' cmds can be used." \
@@ -337,7 +337,7 @@ def parse_cmdline():
 
     p.add_argument("--list", action='store_true',
             help="List the current configuration parameters", default=False)
-    p.add_argument("--set", action='store_true',
+    p.add_argument("--setup", action='store_true',
             help="Write the --wg-server, --wg-client, and (optional) --default-gw to the config file",
             default=False)
 
