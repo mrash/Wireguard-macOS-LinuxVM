@@ -41,13 +41,13 @@ To fully implement Wireguard in this manner, we'll assume the following:
  * Wireguard has been [installed](https://www.wireguard.com/install/) on both Ubuntu VM's,
    and key pairs have been [generated and shared](https://www.wireguard.com/quickstart/).
  * Wireguard client - Mac laptop hostname and IP addresses:
-   * Mac laptop hostname: `wgclient`
-   * Mac laptop wireless IP on the coffee shop network: `192.168.10.54`, interface: `en0`
+   * Mac laptop hostname: `maclaptop`
+   * Mac laptop wireless IP on the coffee shop network: `192.168.0.54`, interface: `en0`
    * Mac laptop Ubuntu VM Wireguard hostname: `wgclientvm`, IP: `10.211.44.31`
    * Mac laptop Ubuntu VM Wireguard IP: `10.33.33.2`, interface: `wg0`
  * Wireguard server - Ubuntu system hostname and IP addresses:
    * Hostname: `wgserver`
-   * IP: `2.2.2.2`, interface: `eth0`
+   * IP: `1.1.1.1`, interface: `eth0`
    * Wireguard IP: `10.33.33.1`, interface: `wg0`
 
 Graphically, the network setup looks like this:
@@ -153,7 +153,7 @@ rtt min/avg/max/mdev = 2.336/2.454/2.632/0.134 ms
 
 So, the VPN is up and running. This is great, but now we need to ensure that all traffic is
 routed through the VPN. This applies to both the Ubuntu VM `wgclientvm` and, most importantly,
-to the Mac laptop host `wgclient`. Achieving this is the subject of the next section.
+to the Mac laptop host `maclaptop`. Achieving this is the subject of the next section.
 
 ## Routing and Traffic Filtering
 Routing all traffic over the VPN needs to happen even though the Mac laptop has only one
@@ -162,7 +162,7 @@ default gateway of this network needs to remain intact, but we also need to firs
 everything down to the `wgclientvm` system for routing over the established VPN tunnel.
 
 A convenience script `wg-routes.py` is included for this task. This script is meant to be
-executed on the Mac laptop `wgclient` and it adds three new routes to the routing table on
+executed on the Mac laptop `maclaptop` and it adds three new routes to the routing table on
 the Mac. Although the existing default route is not changed, it is overridden with two more
 specific routes - each for half of the entire IPv4 address space with a gateway of the
 `wgclientvm` IP. The final route is for the Wireguard server out of the gateway originally
@@ -174,7 +174,7 @@ Wireguard endpoints, and an operational mode that adds, deletes, or checks the s
 Wireguard routes. We start with the setup phase:
 
 ```bash
-[wgclient]# ./wg-routes.py --setup --wg-client 10.211.44.31 --wg-server 2.2.2.2
+[maclaptop]# ./wg-routes.py --setup --wg-client 10.211.44.31 --wg-server 1.1.1.1
 Config written to '/var/root/.wg-routes.conf', now 'up|down|status' cmds can be used.
 ```
 
@@ -182,26 +182,26 @@ With the config file written, we can now bring the routes up and also check the 
 (some output has been removed for brevity):
 
 ```bash
-[wgclient]# ./wg-routes.py up
+[maclaptop]# ./wg-routes.py up
 Running cmd: 'route add 0.0.0.0/1 10.211.44.31'
 Running cmd: 'route add 128.0.0.0/1 10.211.44.31'
-Running cmd: 'route add 2.2.2.2 192.168.10.1'
+Running cmd: 'route add 1.1.1.1 192.168.0.1'
 
-[wgclient]# ./wg-routes.py status
+[maclaptop]# ./wg-routes.py status
 Wireguard client route active: '0/1        10.211.44.31  UGSc  50  0   vnic0'
 Wireguard client route active: '128.0/1    10.211.44.31  UGSc   1  0   vnic0'
-Wireguard server route active: '2.2.2.2    192.168.10.1  UGHS   0  0     en0'
+Wireguard server route active: '1.1.1.1    192.168.0.1  UGHS   0  0     en0'
 ```
 
 Note in the above output that there is no need to manually specify the default
-gateway `192.168.10.1` on the wireless network since `wg-routes.py` automatically
+gateway `192.168.0.1` on the wireless network since `wg-routes.py` automatically
 parses it out of the routing table.
 
 ```bash
 [wgclient]# ./wg-routes.py down
 Running cmd: 'route delete 0.0.0.0/1 10.211.44.31'
 Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
-Running cmd: 'route delete 2.2.2.2 192.168.10.1'
+Running cmd: 'route delete 1.1.1.1 192.168.0.1'
 ```
 
 With the routes now directing all IP traffic to the `wgclientvm` system, there are
@@ -214,18 +214,61 @@ Wireguard tunnel. Second, IP forwarding needs to be allowed on `wgclientvm` as w
 [wgclientvm]# echo 1 > /proc/sys/net/ipv4/ip_forward
 ```
 
-This concludes the necessary steps to route all traffic from both the Mac laptop `wgclient`
-and the `wgclientvm` systems through Wireguard to the `wgserver` system and out to the
+This concludes the necessary steps to route all traffic from both the Mac laptop `maclaptop`
+and the `wgclientvm` systems through Wireguard to the `wgserver` system and then out to the
 broader Internet. Note that the `wg-quick` tool that instantiated the Wireguard instance
-on `wgclientvm` also sets up routing such that everything is sent over Wireguard.
-
-Now let's test it:
-```bash
-```
-
-### Traffic Filtering with PF and iptables
+on `wgclientvm` also sets up routing such that everything is sent over Wireguard too.
 
 ### Verifying Traffic Routing
+With the Wireguard VPN up and running and routing configured on the Mac `maclaptop` laptop
+to send everything over the VPN, let's verify that IP traffic is indeed sent via Wireguard.
+For this, we'll use `tcpdump` on the `en0` interface and then `ping 8.8.8.8`.
+Because the Wireguard configuration in the previous section set `ListenPort = 30003`, the
+only traffic we should see on `en0` should be UDP traffic on port 30003. Simultaneously,
+if we sniff the `wg0` interface on `wgclientvm`, we should only ICMP traffic to and from
+`8.8.8.8`. All of this is displayed below, with the understanding that the `ping` command
+is run after both `tcpdump` commands have been started so we see everything:
+
+```bash
+[maclaptop]$ ping -c 3 8.8.8.8
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+64 bytes from 8.8.8.8: icmp_seq=0 ttl=119 time=16.503 ms
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=119 time=14.590 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=119 time=15.574 ms
+
+--- 8.8.8.8 ping statistics ---
+3 packets transmitted, 3 packets received, 0.0% packet loss
+round-trip min/avg/max/stddev = 14.590/15.556/16.503/0.781 ms
+
+[maclaptop]# tcpdump -i en0 -l -nn host 8.8.8.8 or udp port 30003
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on en0, link-type EN10MB (Ethernet), capture size 262144 bytes
+08:04:04.331354 IP 192.168.0.54.59689 > 1.1.1.1.30003: UDP, length 128
+08:04:04.354699 IP 1.1.1.1.30003 > 192.168.0.54.59689: UDP, length 128
+08:04:05.366354 IP 192.168.0.54.59689 > 1.1.1.1.30003: UDP, length 128
+08:04:05.380174 IP 1.1.1.1.30003 > 192.168.0.54.59689: UDP, length 128
+08:04:06.367378 IP 192.168.0.54.59689 > 1.1.1.1.30003: UDP, length 128
+08:04:06.381984 IP 1.1.1.1.30003 > 192.168.0.54.59689: UDP, length 128
+
+[wgclientvm]# tcpdump -i wg0 -l -nn
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on wg0, link-type RAW (Raw IP), capture size 262144 bytes
+08:04:04.342244 IP 10.33.33.2 > 8.8.8.8: ICMP echo request, id 41318, seq 0, length 64
+08:04:04.356653 IP 8.8.8.8 > 10.33.33.2: ICMP echo reply, id 41318, seq 0, length 64
+08:04:05.367577 IP 10.33.33.2 > 8.8.8.8: ICMP echo request, id 41318, seq 1, length 64
+08:04:05.382197 IP 8.8.8.8 > 10.33.33.2: ICMP echo reply, id 41318, seq 1, length 64
+08:04:06.368739 IP 10.33.33.2 > 8.8.8.8: ICMP echo request, id 41318, seq 2, length 64
+08:04:06.383300 IP 8.8.8.8 > 10.33.33.2: ICMP echo reply, id 41318, seq 2, length 64
+```
+
+The above proof gives us confidence that routing is configured properly, and that
+traffic is being sent over Wireguard.
+
+### macOS Traffic Filtering with PF
+With Wireguard functioning as we want it, we don't need to solely rely on proper routing
+to enforce IP communications to traverse the VPN. That is, we can also implement a restrictive
+packet filtering policy with the PF firewall on the Mac laptop as well. This policy will only
+allow VPN communications with the upstream `wgserver`, and drop everything else.
 
 ### DNS
 
