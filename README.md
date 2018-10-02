@@ -216,13 +216,6 @@ parses it out of the routing table. Further, `wg-routes.py` builds a default-dro
 PF policy against all communications on `en0` except for Wireguard UDP traffic
 and for DHCP requests/responses.
 
-```bash
-[wgclient]# ./wg-routes.py down
-Running cmd: 'route delete 0.0.0.0/1 10.211.44.31'
-Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
-Running cmd: 'route delete 1.1.1.1 192.168.0.1'
-```
-
 This concludes the necessary steps to route all traffic from both the Mac laptop `maclaptop`
 and the `wgclientvm` systems through Wireguard to the `wgserver` system and then out to the
 broader Internet. In addition, the PF firewall on the Mac laptop drops all non-DHCP and non-Wireguard
@@ -273,6 +266,21 @@ listening on wg0, link-type RAW (Raw IP), capture size 262144 bytes
 
 The above proof gives us confidence that routing is configured properly, and that
 traffic is being sent over Wireguard.
+
+### Shutting Down Wireguard
+After leaving the coffee shop, it is easy to restore the routing table and PF configuration
+on the Mac as follows:
+
+```bash
+[wgclient]# ./wg-routes.py down
+Running cmd: 'route delete 0.0.0.0/1 10.211.44.31'
+Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
+Running cmd: 'route delete 1.1.1.1 192.168.0.1'
+Restoring original PF rules via command: 'pfctl -f /etc/pf.conf'
+```
+
+Depending on your usage model for the Mac, it may be desirable to just leave Wireguard up
+and running on `wgclientvm`. If not, the command `wg-quick down wg0` will shut it down.
 
 ## License
 This repository is released as open source software under the terms of
