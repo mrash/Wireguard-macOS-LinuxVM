@@ -1,5 +1,14 @@
 # Wireguard, macOS, and Linux Virtual Machines
 
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Wireguard Configuration](#wireguard-configuraton)
+- [Routing and Traffic Filtering](#routing-and-traffic-filtering)
+  - [Verifying Traffic Routing](#verifying-traffic-routing)
+- [Shutting Down Wireguard](#shutting-down-wireguard)
+- [License](#license)
+- [Contact](#contact)
+
 ## Introduction
 Over the long term, the Wireguard VPN is set to send shockwaves through the VPN community
 with its modern cryptographic design, performance, stealthiness against active scanners, and
@@ -267,7 +276,7 @@ listening on wg0, link-type RAW (Raw IP), capture size 262144 bytes
 The above proof gives us confidence that routing is configured properly, and that
 traffic is being sent over Wireguard.
 
-### Shutting Down Wireguard
+## Shutting Down Wireguard
 After leaving the coffee shop, it is easy to restore the routing table and PF configuration
 on the Mac as follows:
 
