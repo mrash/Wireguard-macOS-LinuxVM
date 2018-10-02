@@ -54,6 +54,7 @@ To fully implement Wireguard in this manner, we'll assume the following:
 Graphically, the network setup looks like this:
 
 ![alt text][Wireguard-network-diagram]
+
 [Wireguard-network-diagram]: doc/Wireguard_net.png "Wireguard Network Diagram"
 
 ## Wireguard Configuration
