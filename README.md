@@ -104,6 +104,10 @@ This is so that connections to any systems around the Internet worldwide will be
 transit the Wireguard VPN. The server side does not need the same `AllowedIPs` line because the
 source address of all traffic from the server's perspective will be the client IP of `10.33.33.2`.
 
+Also, the `PostUp` line sets up the necessary `iptables` NAT configuration and IP forwarding to
+translate all incoming traffic from the Mac laptop to the source IP of the Wireguard tunnel.
+The `PostDown` line removes the iptables rules added by the `PostUp` line.
+
 With the Wireguard client and server configurations defined, it is time to bring up the VPN
 from both sides.
 
@@ -130,14 +134,15 @@ from both sides.
 [#] ip -4 route add 0.0.0.0/0 dev wg0 table 51820
 [#] ip -4 rule add not fwmark 51820 table 51820
 [#] ip -4 rule add table main suppress_prefixlength 0
+[#] iptables -I FORWARD 1 -i wg0 -j ACCEPT && iptables -I FORWARD 1 -o wg0 -j ACCEPT && iptables -t nat -I POSTROUTING 1 -s 10.211.55.2 -j SNAT --to 10.44.44.2 && echo 1 > /proc/sys/net/ipv4/ip_forward
 [wgclientvm]# wg
 interface: wg0
-  public key: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+  public key: 3LD8h3Cq7PgmCPyFaqOzEjF59UJFbtgR0TPAM86iYzg=
   private key: (hidden)
   listening port: 30003
   fwmark: 0xca6c
 
-peer: DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
+peer: yKRBaa9yLKlxLmIiPQKaKj9TD0u1+BfDCUHk0tF6rG4=
   endpoint: 1.1.1.1:30003
   allowed ips: 0.0.0.0/0, ::/0
   latest handshake: 2 seconds ago
@@ -217,19 +222,10 @@ Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
 Running cmd: 'route delete 1.1.1.1 192.168.0.1'
 ```
 
-With the routes now directing all IP traffic to the `wgclientvm` system, there are
-two details to take care of. First, on `wgclientvm` we need to create a NAT rule so that
-all incoming traffic from the Mac laptop are translated to the source IP of the
-Wireguard tunnel. Second, IP forwarding needs to be allowed on `wgclientvm` as well:
-
-```bash
-[wgclientvm]# iptables -t nat -A POSTROUTING -s 10.211.44.2 -j SNAT --to 10.33.33.2
-[wgclientvm]# echo 1 > /proc/sys/net/ipv4/ip_forward
-```
-
 This concludes the necessary steps to route all traffic from both the Mac laptop `maclaptop`
 and the `wgclientvm` systems through Wireguard to the `wgserver` system and then out to the
-broader Internet. Note that the `wg-quick` tool that instantiated the Wireguard instance
+broader Internet. In addition, the PF firewall on the Mac laptop drops all non-DHCP and non-Wireguard
+communications on `en0`. Note that the `wg-quick` tool that instantiated the Wireguard instance
 on `wgclientvm` also sets up routing such that everything is sent over Wireguard too.
 
 ### Verifying Traffic Routing
@@ -276,14 +272,6 @@ listening on wg0, link-type RAW (Raw IP), capture size 262144 bytes
 
 The above proof gives us confidence that routing is configured properly, and that
 traffic is being sent over Wireguard.
-
-### macOS Traffic Filtering with PF
-With Wireguard functioning as we want it, we don't need to solely rely on proper routing
-to enforce IP communications to traverse the VPN. That is, we can also implement a restrictive
-packet filtering policy with the PF firewall on the Mac laptop as well. This policy will only
-allow VPN communications with the upstream `wgserver`, and drop everything else.
-
-### DNS
 
 ## License
 This repository is released as open source software under the terms of
