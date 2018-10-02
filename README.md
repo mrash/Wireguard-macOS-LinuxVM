@@ -170,8 +170,9 @@ rtt min/avg/max/mdev = 2.336/2.454/2.632/0.134 ms
 ```
 
 So, the VPN is up and running. This is great, but now we need to ensure that all traffic is
-routed through the VPN. This applies to both the Ubuntu VM `wgclientvm` and, most importantly,
-to the Mac laptop host `maclaptop`. Achieving this is the subject of the next section.
+routed through it. This applies to both the Ubuntu VM `wgclientvm` and, most importantly,
+to traffic coming from Mac laptop host `maclaptop` itself. Achieving this is the subject of
+the next section.
 
 ## Routing and Traffic Filtering
 Routing all traffic over the VPN needs to happen even though the Mac laptop has only one
@@ -180,7 +181,7 @@ default gateway of this network needs to remain intact, but we also need to firs
 everything down to the `wgclientvm` system for routing over the established VPN tunnel.
 
 A convenience script `wg-routes.py` is included for this task. This script is meant to be
-executed on the Mac laptop `maclaptop` and it adds three new routes to the routing table on
+executed on the Mac laptop  and it adds three new routes to the routing table on
 the Mac. Although the existing default route is not changed, it is overridden with two more
 specific routes - each for half of the entire IPv4 address space with a gateway of the
 `wgclientvm` IP. The final route is for the Wireguard server out of the gateway originally
@@ -232,7 +233,7 @@ communications on `en0`. Note that the `wg-quick` tool that instantiated the Wir
 on `wgclientvm` also sets up routing such that everything is sent over Wireguard too.
 
 ### Verifying Traffic Routing
-With the Wireguard VPN up and running and routing configured on the Mac `maclaptop` laptop
+With the Wireguard VPN up and running and routing configured on `maclaptop`
 to send everything over the VPN, let's verify that IP traffic is indeed sent via Wireguard.
 For this, we'll use `tcpdump` on the `en0` interface and then `ping 8.8.8.8`.
 Because the Wireguard configuration in the previous section set `ListenPort = 30003`, the
@@ -289,7 +290,8 @@ Restoring original PF rules via command: 'pfctl -f /etc/pf.conf'
 ```
 
 Depending on your usage model for the Mac, it may be desirable to just leave Wireguard up
-and running on `wgclientvm`. If not, the command `wg-quick down wg0` will shut it down.
+and running on `wgclientvm`. If not, the command `wg-quick down wg0` will shut it down as
+well.
 
 ## License
 This repository is released as open source software under the terms of
