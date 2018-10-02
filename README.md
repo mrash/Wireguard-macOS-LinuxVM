@@ -60,8 +60,8 @@ Graphically, the network setup looks like this:
 On `wgserver`, we have only one peer to worry about (`wgclientvm`), but this could be
 expanded to arbitrarily many peers if necessary in order to support lots of VPN clients
 for more complex scenarios. For now, we just have one peer, and the configuration is
-shown below. Note the cryptographic keys have been replaced with dummy keys for obvious
-reasons - you will need to generate your own keys per the prerequisites above. See the
+shown below. Note the cryptographic keys below are obviously for testing purposes
+only - you will need to generate your own keys per the prerequisites above. See the
 [Wireguard Quickstart](https://www.wireguard.com/quickstart/) page for detailed
 instructions. The main command to get things going is:
 
@@ -76,10 +76,10 @@ Now, the `wgserver` configuration:
 [Interface]
 Address = 10.33.33.1/32
 ListenPort = 30003
-PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+PrivateKey = WD5wagqwC3o/JO6TVLov/jdoxu+Z1leiyuIlnQqbT3M=
 
 [Peer]
-PublicKey = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+PublicKey = 3LD8h3Cq7PgmCPyFaqOzEjF59UJFbtgR0TPAM86iYzg=
 AllowedIps = 10.33.33.2/32
 ```
 
@@ -88,13 +88,13 @@ And on `wgclientvm` we have:
 [wgclientvm]# cat /etc/wireguard/wg0.conf
 [Interface]
 Address = 10.33.33.2/32
-PostUp   = iptables -I FORWARD 1 -i %i -j ACCEPT; iptables -I FORWARD 1 -o %i -j ACCEPT; iptables -t nat -I POSTROUTING 1 -s 10.211.44.2 -j SNAT --to 10.33.33.2
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.211.44.2 -j SNAT --to 10.33.33.2
+PostUp   = iptables -I FORWARD 1 -i %i -j ACCEPT && iptables -I FORWARD 1 -o %i -j ACCEPT && iptables -t nat -I POSTROUTING 1 -s 10.211.44.2 -j SNAT --to 10.33.33.2 && echo 1 > /proc/sys/net/ipv4/ip_forward
+PostDown = iptables -D FORWARD -i %i -j ACCEPT && iptables -D FORWARD -o %i -j ACCEPT && iptables -t nat -D POSTROUTING -s 10.211.44.2 -j SNAT --to 10.33.33.2
 ListenPort = 30003
-PrivateKey = CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=
+PrivateKey = AEXOcHOMZkn2B5lOElBTMqLsB5P8oIbYSVYGa6ku6Hc=
 
 [Peer]
-PublicKey = DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=
+PublicKey = yKRBaa9yLKlxLmIiPQKaKj9TD0u1+BfDCUHk0tF6rG4=
 AllowedIps = 0.0.0.0/0, ::0/0
 Endpoint = 1.1.1.1:30003
 ```
