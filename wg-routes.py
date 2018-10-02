@@ -70,12 +70,17 @@ def main():
             ### now that we have the default gateway, the wireguard
             ### server, and the local VM IP's, add the routes
             route_update(cmd, conf)
+
+            ### update the PF policy if so configured
+            pf_update(cmd, conf, config_file)
+
             if cmd == 'up':
                 up_guidance(conf['WG_CLIENT'])
             else:
                 down_guidance(conf['WG_CLIENT'])
         else:
             route_status(conf)
+            pf_status(conf)
 
         return 0
 
@@ -100,29 +105,57 @@ def main():
     if not cargs.wg_client:
         raise NameError("[*] Specify the local VM IP/hostname where the Wireguard client is running with --wg-client")
 
+    if not cargs.wg_port:
+        raise NameError("[*] Specify the Wireguard UDP port number with --wg-port")
+
     if cargs.config_file:
         config_file = cargs.config_file
 
+    if cargs.pf_config_file:
+        pf_config_file = cargs.pf_config_file
+    else:
+        pf_config_file = os.path.expanduser("~/.wg-pf.conf")
+
+    if cargs.pf_rules_file:
+        pf_rules_file = cargs.pf_rules_file
+    else:
+        pf_rules_file = os.path.expanduser("~/.wg-pf.rules")
+
     if cargs.setup:
         ### write the config and exit
-        write_config(config_file, cargs)
-        print "Config written to '%s', now 'up|down|status' cmds can be used." \
-                % config_file
+        write_config(config_file, pf_config_file, pf_rules_file, cargs)
+        write_pf_config(pf_config_file, pf_rules_file, cargs)
+        write_pf_rules(pf_rules_file, cargs)
+        print "Configs written to '%s', '%s',\nand '%s'. Now 'up|down|status' cmds can be used." \
+                % (config_file, pf_config_file, pf_rules_file)
 
     return 0
 
 def parse_config(conf, config_file):
     with open(config_file, 'r') as f:
         for line in f:
-            for var in ['WG_CLIENT', 'WG_SERVER', 'DEFAULT_GW']:
+            for var in ['WG_CLIENT',
+                    'WG_SERVER',
+                    'DEFAULT_GW',
+                    'ENABLE_PF_POLICY',
+                    'PF_CONFIG_FILE',
+                    'PF_ANCHOR_FILE',
+                    'PF_INTF']:
                 m = re.search("^\s*%s\s+(\S+)" % var, line)
                 if m:
                     ### resolve via DNS if necessary at parse time to allow hostnames
                     ### in the config
-                    conf[var] = resolve(m.group(1))
+                    if var in ['WG_CLIENT', 'WG_SERVER', 'DEFAULT_GW']:
+                        conf[var] = resolve(m.group(1))
+                    else:
+                        conf[var] = m.group(1)
                     break
-    if 'DEFAULT_GW' not in conf:
-        conf['DEFAULT_GW'] = get_default_gw()
+    if 'DEFAULT_GW' not in conf or 'PF_INTF' not in conf:
+        gw, intf = get_default_gw()
+        if 'DEFAULT_GW' not in conf:
+            conf['DEFAULT_GW'] = gw
+        if 'PF_INTF' not in conf:
+            conf['PF_INTF'] = gw
     return
 
 def display_config(config_file, cargs):
@@ -133,7 +166,19 @@ def display_config(config_file, cargs):
     print
     return
 
-def write_config(config_file, cargs):
+def write_config(config_file, pf_config_file, pf_rules_file, cargs):
+
+    def_gw = "# DEFAULT_GW        NA"
+    if cargs.default_gw:
+        def_gw = "DEFAULT_GW          %s" % cargs.default_gw
+
+    enable_pf = "ENABLE_PF_POLICY    Y"
+    if cargs.disable_pf_policy:
+        enable_pf = "ENABLE_PF_POLICY    N"
+
+    pf_intf = "# PF_INTF           NA"
+    if cargs.default_gw:
+        pf_intf = "PF_INTF          %s" % cargs.pf_interface
 
     with open(config_file, 'w') as f:
         f.write('''#
@@ -143,17 +188,71 @@ def write_config(config_file, cargs):
 # The WG_CLIENT IP is usually a local VM running Wireguard
 WG_CLIENT           %s
 
-# The WG_SERVER IP is the remote Internet-connected system running Wireguard
+# The WG_SERVER IP is the remote Internet-connected system running Wireguard.
+# All traffic will be routed through this system.
 WG_SERVER           %s
 
 # Normally the default gateway is parsed from the local routing table and
 # therefore does not need to be set here. It is only set if the --default-gw
 # command line switch is used.
-# DEFAULT_GW        __CHANGEME__
-''' % (__file__, cargs.wg_client, cargs.wg_server))
+%s
 
-        if cargs.default_gw:
-            f.write("DEFAULT_GW          %s" % cargs.default_gw)
+# Control whether to add a default-drop PF policy for everything except
+# Wireguard communications and DHCP traffic. The default is for this feature
+# to be enabled, but this can be changed with the --disable-pf-policy command
+# line argument. Also set the paths to the PF config and rules files.
+%s
+PF_CONFIG_FILE      %s
+PF_RULES_FILE       %s
+
+# Normally the interface to which PF rules are restricted is parsed from the
+# default gateway route. However, it can be set manually with --pf-interface
+# if necessary
+%s
+''' % (__file__, cargs.wg_client, cargs.wg_server, def_gw, enable_pf,
+    pf_config_file, pf_rules_file, pf_intf))
+
+    return
+
+def write_pf_config(pf_config_file, pf_rules_file, cargs):
+
+    with open(pf_config_file, 'w') as f:
+        f.write('''#
+# This file is auto-generated by the '%s' tool, and sets up a PF policy
+# that restricts communications to go over Wireguard.
+anchor "wg-pf.rules"
+load anchor "wg-pf.rules" from "%s"
+''' % (__file__, pf_rules_file))
+
+    return
+
+def write_pf_rules(pf_rules_file, cargs):
+
+    if cargs.pf_interface:
+        intf = cargs.pf_interface
+    else:
+        intf = get_default_gw()[1]
+
+    with open(pf_rules_file, 'w') as f:
+        f.write('''#
+# This file is auto-generated by the '%s' tool, and sets up a PF policy
+# that restricts communications to go over Wireguard.
+WG_SERVER = "%s"
+WG_PORT = "%s"
+INTF = "%s"
+
+block in log on $INTF all
+block out log on $INTF all
+
+# Allow DHCP
+pass quick on $INTF inet proto tcp from any port 67:68 to any port 67:68 keep state flags S/SA
+pass quick on $INTF inet proto udp from any port 67:68 to any port 67:68 keep state
+
+# Restrict everything to Wireguard communications
+pass out quick on $INTF inet proto udp from any to $WG_SERVER port $WG_PORT keep state
+
+''' % (__file__, cargs.wg_server, cargs.wg_port, intf))
+
     return
 
 def up_guidance(wg_client):
@@ -174,10 +273,66 @@ E.g.:
 
 def down_guidance(wg_client):
     print '''
-Applicable routes have been removed. The corresponding NAT rule and IP
-forwarding configuration can be removed from the '%s' Wireguard
-client system.
+Applicable routes and PF rules have been removed. The corresponding NAT rule and
+IP forwarding configuration can (optionally) be removed from the '%s'
+Wireguard client system.
 ''' % wg_client
+    return
+
+def pf_update(cmd, conf, config_file):
+
+    if conf['ENABLE_PF_POLICY'] != 'Y':
+        print "PF policy disabled in config file '%s', no action taken." % config_file
+        return
+
+    if cmd == 'up':
+        pf_test_rules(conf)
+        pfcmd = "pfctl -f %s" % conf['PF_CONFIG_FILE']
+        print "Implementing default-drop PF policy via command: '%s'" % pfcmd
+        run_cmd(pfcmd)
+    else:
+        ### restore original PF rules
+        pfcmd = "pfctl -f /etc/pf.conf"
+        print "Restoring original PF rules via command: '%s'" % pfcmd
+        run_cmd(pfcmd)
+
+    return
+
+def pf_status(conf):
+
+    if conf['ENABLE_PF_POLICY'] != 'Y':
+        print "PF policy disabled in config file '%s', no available status." % config_file
+        return
+
+    ### first see if the wg-pf.rules anchor is active
+    found_wg_anchor = False
+
+    wg_anchor = 'wg-pf.rules'
+    (es, out) = run_cmd("pfctl -sr")
+    if es == 0:
+        for line in out:
+            if 'anchor' in line and wg_anchor in line:
+                found_wg_anchor = True
+                break
+
+    if found_wg_anchor:
+        (es, out) = run_cmd("pfctl -a %s -sr" % wg_anchor)
+
+        if es == 0:
+            for line in out:
+                if 'block' in line or 'pass' in line:
+                    print "Wireguard PF '%s' anchor rule active: '%s'" % (wg_anchor, line)
+    else:
+        print "No active Wireguard PF anchor '%s'" % wg_anchor
+    return
+
+def pf_test_rules(conf):
+    cmd = "pfctl -n -f %s" % conf['PF_CONFIG_FILE']
+    (es, out) = run_cmd(cmd)
+    if es != 0:
+        print "[*] pf_test_rules() error, CMD: %s" % cmd
+        for line in out:
+            print line
     return
 
 def route_status(conf):
@@ -279,6 +434,7 @@ def get_default_gw():
 
     gw    = ''
     flags = ''
+    intf  = ''
     netstat_cmd = 'netstat -rn'
 
     ### parse 'netstat -rn' output on macOS to get the default (IPv4) gw
@@ -286,24 +442,25 @@ def get_default_gw():
     ### default            192.168.0.1        UGSc           69        0     en0
 
     for line in run_cmd(netstat_cmd)[1]:
-        m = re.search('default\s+((?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2})\s+(\w+)\s', line)
+        m = re.search('default\s+((?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2})\s+(\w+)\s+(?:\S+\s+){2}(\S+)', line)
         if m:
             gw    = m.group(1)
             flags = m.group(2)
+            intf  = m.group(3)
             break
 
     if gw and flags:
         for flag in ['G', 'U']:
             if flag not in flags:
                 raise NameError(
-                    "[*] Default gateway '%s' does not have the '%s' flag, set with --default-gw" \
+                    "[*] Default gateway '%s' does not have the '%s' flag, set --default-gw and --pf-interface" \
                             % (gw, flag))
     else:
         raise NameError(
-            "[*] Could not parse default gateway from '%s' output, set with --default-gw" \
+            "[*] Could not parse default gateway from '%s' output, set --default-gw and --pf-interface" \
                     % netstat_cmd)
 
-    return gw
+    return gw, intf
 
 def run_cmd(cmd):
     out = []
@@ -333,8 +490,24 @@ def parse_cmdline():
     p.add_argument("--wg-client", type=str,
             help="Set the local VM IP/hostname where the Wireguard client is running",
             default=False)
+    p.add_argument("--wg-port", type=str,
+            help="Set the UDP port number that is used in the Wireguard configuration",
+            default=False)
     p.add_argument("--default-gw", type=str,
             help="Manually set the IPv4 default gw (normally parsed from the routing table)",
+            default=False)
+
+    p.add_argument("--disable-pf-policy", action='store_true',
+            help="Do not create a default-drop PF policy for all except Wireguard communications",
+            default=False)
+    p.add_argument("--pf-config-file", type=str,
+            help="Set the path to the PF config file (default: ~/.wg-pf.conf)",
+            default=False)
+    p.add_argument("--pf-rules-file", type=str,
+            help="Set the path to the PF rules file (default: ~/.wg-pf.rules)",
+            default=False)
+    p.add_argument("--pf-interface", type=str,
+            help="Set the interface for PF rules (normally parsed from the default gw route)",
             default=False)
 
     p.add_argument("--list", action='store_true',
