@@ -43,6 +43,7 @@ To fully implement Wireguard in this manner, we'll assume the following:
  * Wireguard client - Mac laptop hostname and IP addresses:
    * Mac laptop hostname: `maclaptop`
    * Mac laptop wireless IP on the coffee shop network: `192.168.0.54`, interface: `en0`
+   * Mac laptop virtual NIC IP (under Parallels): `10.211.44.2`, interface: `vnic0`
    * Mac laptop Ubuntu VM Wireguard hostname: `wgclientvm`, IP: `10.211.44.31`
    * Mac laptop Ubuntu VM Wireguard IP: `10.33.33.2`, interface: `wg0`
  * Wireguard server - Ubuntu system hostname and IP addresses:
@@ -87,6 +88,8 @@ And on `wgclientvm` we have:
 [wgclientvm]# cat /etc/wireguard/wg0.conf
 [Interface]
 Address = 10.33.33.2/32
+PostUp   = iptables -I FORWARD 1 -i %i -j ACCEPT; iptables -I FORWARD 1 -o %i -j ACCEPT; iptables -t nat -I POSTROUTING 1 -s 10.211.44.2 -j SNAT --to 10.33.33.2
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.211.44.2 -j SNAT --to 10.33.33.2
 ListenPort = 30003
 PrivateKey = CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=
 
@@ -170,32 +173,42 @@ assigned to the default route. The original default route can optionally be dele
 these routes are established and everything is sent over the VPN.
 
 The `wg-routes.py` script has a setup mode that generates a config file from the specified
-Wireguard endpoints, and an operational mode that adds, deletes, or checks the status of
-Wireguard routes. We start with the setup phase:
+Wireguard endpoints along with PF config and anchor files, and an operational mode that
+adds, deletes, or checks the status of Wireguard routes and PF policy rules. We start with
+the setup phase:
 
 ```bash
-[maclaptop]# ./wg-routes.py --setup --wg-client 10.211.44.31 --wg-server 1.1.1.1
-Config written to '/var/root/.wg-routes.conf', now 'up|down|status' cmds can be used.
+[maclaptop]# ./wg-routes.py --setup --wg-client 10.211.44.31 --wg-server 1.1.1.1 --wg-port 30003
+Configs written to '/var/root/.wg-routes.conf', '/var/root/.wg-pf.conf',
+and '/var/root/.wg-pf.rules'. Now 'up|down|status' cmds can be used.
 ```
 
-With the config file written, we can now bring the routes up and also check the status
-(some output has been removed for brevity):
+With the config files written, we can now bring the routes and PF policy up and also check
+the status (some output has been removed for brevity):
 
 ```bash
 [maclaptop]# ./wg-routes.py up
 Running cmd: 'route add 0.0.0.0/1 10.211.44.31'
 Running cmd: 'route add 128.0.0.0/1 10.211.44.31'
 Running cmd: 'route add 1.1.1.1 192.168.0.1'
+Implementing default-drop PF policy via command: 'pfctl -f /var/root/.wg-pf.conf'
 
 [maclaptop]# ./wg-routes.py status
 Wireguard client route active: '0/1        10.211.44.31  UGSc  50  0   vnic0'
 Wireguard client route active: '128.0/1    10.211.44.31  UGSc   1  0   vnic0'
 Wireguard server route active: '1.1.1.1    192.168.0.1  UGHS   0  0     en0'
+Wireguard PF 'wg-pf.rules' anchor rule active: 'block drop in log on en0 all'
+Wireguard PF 'wg-pf.rules' anchor rule active: 'block drop out log on en0 all'
+Wireguard PF 'wg-pf.rules' anchor rule active: 'pass quick on en0 inet proto tcp from any port 67:68 to any port 67:68 flags S/SA keep state'
+Wireguard PF 'wg-pf.rules' anchor rule active: 'pass quick on en0 inet proto udp from any port 67:68 to any port 67:68 keep state'
+Wireguard PF 'wg-pf.rules' anchor rule active: 'pass out quick on en0 inet proto udp from any to 1.1.1.1 port = 30003 keep state'
 ```
 
 Note in the above output that there is no need to manually specify the default
 gateway `192.168.0.1` on the wireless network since `wg-routes.py` automatically
-parses it out of the routing table.
+parses it out of the routing table. Further, `wg-routes.py` builds a default-drop
+PF policy against all communications on `en0` except for Wireguard UDP traffic
+and for DHCP requests/responses.
 
 ```bash
 [wgclient]# ./wg-routes.py down
