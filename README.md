@@ -2,7 +2,7 @@
 
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
-- [Wireguard Configuration](#wireguard-configuraton)
+- [Wireguard Configuration](#wireguard-configuration)
 - [Routing and Traffic Filtering](#routing-and-traffic-filtering)
   - [Verifying Traffic Routing](#verifying-traffic-routing)
 - [Shutting Down Wireguard](#shutting-down-wireguard)
@@ -12,7 +12,7 @@
 ## Introduction
 Over the long term, the Wireguard VPN is set to send shockwaves through the VPN community
 with its modern cryptographic design, performance, stealthiness against active scanners, and
-committment to security through a minimally complex code base. It is my belief that these
+commitment to security through a minimally complex code base. It is my belief that these
 characteristics firmly place Wireguard among the best VPN options available. Over time, it is
 likely that commercial solutions will be developed around Wireguard similarly to commercial
 wrappers around OpenVPN.
