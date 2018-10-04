@@ -213,7 +213,7 @@ Implementing default-drop PF policy via command: 'pfctl -f /var/root/.wg-pf.conf
 [maclaptop]# ./wg-routes.py status
 Wireguard client route active: '0/1        10.211.44.31  UGSc  50  0   vnic0'
 Wireguard client route active: '128.0/1    10.211.44.31  UGSc   1  0   vnic0'
-Wireguard server route active: '1.1.1.1    192.168.0.1  UGHS   0  0     en0'
+Wireguard server route active: '1.1.1.1    192.168.0.1   UGHS   0  0     en0'
 Wireguard PF 'wg-pf.rules' anchor rule active: 'block drop in log on en0 all'
 Wireguard PF 'wg-pf.rules' anchor rule active: 'block drop out log on en0 all'
 Wireguard PF 'wg-pf.rules' anchor rule active: 'pass quick on en0 inet proto tcp from any port 67:68 to any port 67:68 flags S/SA keep state'
