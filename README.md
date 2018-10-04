@@ -10,19 +10,19 @@
 - [Contact](#contact)
 
 ## Introduction
-Over the long term, the Wireguard VPN is set to send shockwaves through the VPN community
-with its modern cryptographic design, performance, stealthiness against active scanners, and
-commitment to security through a minimally complex code base. It is my belief that these
-characteristics firmly place Wireguard among the best VPN options available. Over time, it is
-likely that commercial solutions will be developed around Wireguard similarly to commercial
-wrappers around OpenVPN.
+Over the long term, the [Wireguard VPN](https://www.wireguard.com/) is set to send shockwaves
+through the VPN community with its modern cryptographic design, performance, stealthiness against
+active network scanners, and commitment to security through a minimally complex code base. It is
+my belief that these characteristics firmly place Wireguard among the best VPN options available.
+Over time, it is likely that commercial solutions will be developed around Wireguard similarly to
+commercial wrappers around OpenVPN.
 
 This repository is dedicated to deploying a Wireguard VPN on macOS via a Linux VM running
 under a virtualization solution such as Parallels. There are many alternatives to this
 approach - including omitting the Linux piece altogether and using the cross-platform macOS
 [Wireguard tools](https://www.wireguard.com/xplatform/) - but I'm interested in using the
 Wireguard kernel module from a Mac. This has to be done from a Linux VM or container, and we'll
-go the VM route in this write up.
+talk about the VM route in this write up.
 
 The primary use case for running such a VPN solution is to provide security for network traffic
 emanating from a Mac laptop that is connected to a potentially hostile wireless network. This
