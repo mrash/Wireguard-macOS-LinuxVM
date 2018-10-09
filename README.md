@@ -283,7 +283,7 @@ After leaving the coffee shop, it is easy to restore the routing table and PF co
 on the Mac as follows:
 
 ```bash
-[wgclient]# ./wg-routes.py down
+[maclaptop]# ./wg-routes.py down
 Running cmd: 'route delete 0.0.0.0/1 10.211.44.31'
 Running cmd: 'route delete 128.0.0.0/1 10.211.44.31'
 Running cmd: 'route delete 1.1.1.1 192.168.0.1'
