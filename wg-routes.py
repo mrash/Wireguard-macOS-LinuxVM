@@ -146,7 +146,11 @@ def parse_config(conf, config_file):
                     ### resolve via DNS if necessary at parse time to allow hostnames
                     ### in the config
                     if var in ['WG_CLIENT', 'WG_SERVER', 'DEFAULT_GW']:
-                        conf[var] = resolve(m.group(1))
+                        try:
+                            conf[var] = resolve(m.group(1))
+                        except:
+                            raise NameError("[*] Could not resolve %s '%s' to an IP address." \
+                                    % (var, m.group(1)))
                     else:
                         conf[var] = m.group(1)
                     break
