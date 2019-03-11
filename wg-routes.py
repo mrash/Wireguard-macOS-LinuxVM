@@ -2,7 +2,7 @@
 #
 #  File: wg_routes.py
 #
-#  Version: 0.1
+#  Version: 0.2
 #
 #  Purpose: Manipulate the routing table on macOS to enable or disable default
 #           routing through a Wireguard tunnel running under a Linux VM.
@@ -39,7 +39,7 @@ try:
 except ImportError:
     import subprocess
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 def main():
 
