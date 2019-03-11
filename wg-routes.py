@@ -139,7 +139,7 @@ def parse_config(conf, config_file):
                     'DEFAULT_GW',
                     'ENABLE_PF_POLICY',
                     'PF_CONFIG_FILE',
-                    'PF_ANCHOR_FILE',
+                    'PF_RULES_FILE',
                     'PF_INTF']:
                 m = re.search("^\s*%s\s+(\S+)" % var, line)
                 if m:
@@ -160,6 +160,17 @@ def parse_config(conf, config_file):
             conf['DEFAULT_GW'] = gw
         if 'PF_INTF' not in conf:
             conf['PF_INTF'] = gw
+    return
+
+def pf_validate_server_ip(conf, config_file):
+    with open(conf['PF_RULES_FILE'], 'r') as f:
+        for line in f:
+            m = re.search('^\s*WG_SERVER\s+=\s+\"(\S+)\"', line)
+            if m:
+                if m.group(1) != conf['WG_SERVER']:
+                    raise NameError("[*] WG_SERVER not equal between configs '%s' and '%s'" \
+                            % (conf['PF_RULES_FILE'], config_file))
+                break
     return
 
 def display_config(config_file, cargs):
@@ -290,6 +301,9 @@ def pf_update(cmd, conf, config_file):
         return
 
     if cmd == 'up':
+        ### before we implement the default-drop PF policy, make sure the WG_SERVER
+        ### variable in the PF rules file matches the same IP in the main config file
+        pf_validate_server_ip(conf, config_file)
         pf_test_rules(conf)
         pfcmd = "pfctl -f %s" % conf['PF_CONFIG_FILE']
         print "Implementing default-drop PF policy via command: '%s'" % pfcmd
