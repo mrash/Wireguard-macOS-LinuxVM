@@ -19,10 +19,11 @@ commercial wrappers around OpenVPN.
 
 This repository is dedicated to deploying a Wireguard VPN on macOS via a Linux VM running
 under a virtualization solution such as Parallels. There are many alternatives to this
-approach - including omitting the Linux piece altogether and using the cross-platform macOS
-[Wireguard tools](https://www.wireguard.com/xplatform/) - but I'm interested in using the
-Wireguard kernel module from a Mac. This has to be done from a Linux VM, and that is the
-focus of this write up.
+approach including omitting the Linux piece altogether and using the cross-platform macOS
+[Wireguard tools](https://www.wireguard.com/xplatform/) or the native
+[MacOS client](https://itunes.apple.com/us/app/wireguard/id1451685025?ls=1&mt=12).
+However, I'm interested in using the Wireguard kernel module from a Mac. This has to be done from
+a Linux VM, and that is the focus of this write up.
 
 The primary use case for running such a VPN solution is to provide security for network traffic
 emanating from a Mac laptop that is connected to a potentially hostile wireless network. This
