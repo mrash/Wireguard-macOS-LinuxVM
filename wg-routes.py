@@ -460,12 +460,20 @@ def get_default_gw():
     ### default            192.168.0.1        UGSc           69        0     en0
 
     for line in run_cmd(netstat_cmd)[1]:
-        m = re.search('default\s+((?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2})\s+(\w+)\s+(?:\S+\s+){2}(\S+)', line)
-        if m:
-            gw    = m.group(1)
-            flags = m.group(2)
-            intf  = m.group(3)
-            break
+        if 'default' in line:
+            m = re.search('default\s+((?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2})\s+(\w+)\s+(?:\S+\s+){2}(\S+)', line)
+            if m:
+                gw    = m.group(1)
+                flags = m.group(2)
+                intf  = m.group(3)
+                break
+            else:
+                m = re.search('default\s+((?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2})\s+(\w+)\s+(\S+)', line)
+                if m:
+                    gw    = m.group(1)
+                    flags = m.group(2)
+                    intf  = m.group(3)
+                    break
 
     if gw and flags:
         for flag in ['G', 'U']:
